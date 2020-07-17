@@ -294,7 +294,7 @@ public abstract class AbstractSerializationTest {
                 byteArrayOutputStream.toByteArray());
         ObjectInput deserialize = serialization.deserialize(url, byteArrayInputStream);
 
-        assertEquals(1.28F,deserialize.readFloat());
+        assertEquals(1.28F, deserialize.readFloat());
 
         try {
             deserialize.readFloat();
@@ -315,7 +315,7 @@ public abstract class AbstractSerializationTest {
                 byteArrayOutputStream.toByteArray());
         ObjectInput deserialize = serialization.deserialize(url, byteArrayInputStream);
 
-        assertEquals(1.28,deserialize.readDouble());
+        assertEquals(1.28, deserialize.readDouble());
 
         try {
             deserialize.readDouble();

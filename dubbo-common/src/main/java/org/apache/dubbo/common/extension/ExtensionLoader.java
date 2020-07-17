@@ -558,6 +558,7 @@ public class ExtensionLoader<T> {
      * objectFactory 变量的类型为 AdaptiveExtensionFactory，AdaptiveExtensionFactory 内部维护了一个 ExtensionFactory 列表，
      * 用于存储其他类型的 ExtensionFactory。Dubbo 目前提供了两种 ExtensionFactory，分别是 SpiExtensionFactory 和 SpringExtensionFactory。
      * 前者用于创建自适应的拓展，后者是用于从 Spring 的 IOC 容器中获取所需的拓展。
+     *
      * @param instance
      * @return
      */
@@ -658,7 +659,7 @@ public class ExtensionLoader<T> {
 
     /**
      * synchronized in getExtensionClasses
-     * */
+     */
     private Map<String, Class<?>> loadExtensionClasses() {
         cacheDefaultExtensionName();
 
