@@ -104,11 +104,21 @@ public class ExtensionLoader<T> {
         objectFactory = (type == ExtensionFactory.class ? null : ExtensionLoader.getExtensionLoader(ExtensionFactory.class).getAdaptiveExtension());
     }
 
+
+    /**
+     * 判断type上是否有@SPI注解
+     * @param type
+     * @param <T>
+     * @return
+     */
     private static <T> boolean withExtensionAnnotation(Class<T> type) {
         return type.isAnnotationPresent(SPI.class);
     }
 
     @SuppressWarnings("unchecked")
+    /***
+     * 获取extensionLoader
+     */
     public static <T> ExtensionLoader<T> getExtensionLoader(Class<T> type) {
         if (type == null) {
             throw new IllegalArgumentException("Extension type == null");
@@ -116,6 +126,7 @@ public class ExtensionLoader<T> {
         if (!type.isInterface()) {
             throw new IllegalArgumentException("Extension type (" + type + ") is not an interface!");
         }
+        //SPI接口必须加上@SPI注解
         if (!withExtensionAnnotation(type)) {
             throw new IllegalArgumentException("Extension type (" + type +
                     ") is not an extension, because it is NOT annotated with @" + SPI.class.getSimpleName() + "!");
@@ -123,6 +134,7 @@ public class ExtensionLoader<T> {
 
         ExtensionLoader<T> loader = (ExtensionLoader<T>) EXTENSION_LOADERS.get(type);
         if (loader == null) {
+            //如果没有则创建 key：接口   value：extensionLoader
             EXTENSION_LOADERS.putIfAbsent(type, new ExtensionLoader<T>(type));
             loader = (ExtensionLoader<T>) EXTENSION_LOADERS.get(type);
         }
@@ -301,6 +313,12 @@ public class ExtensionLoader<T> {
         return (T) holder.get();
     }
 
+    /**
+     * 缓存中获取holder，获取不到加入缓存
+     * key:name value:Holder
+     * @param name
+     * @return
+     */
     private Holder<Object> getOrCreateHolder(String name) {
         Holder<Object> holder = cachedInstances.get(name);
         if (holder == null) {
@@ -335,14 +353,17 @@ public class ExtensionLoader<T> {
             throw new IllegalArgumentException("Extension name == null");
         }
         if ("true".equals(name)) {
+            //获取默认的扩展实现类
             return getDefaultExtension();
         }
+        //Holder，顾命思义，用于持有目标对象
         final Holder<Object> holder = getOrCreateHolder(name);
         Object instance = holder.get();
         if (instance == null) {
             synchronized (holder) {
                 instance = holder.get();
                 if (instance == null) {
+                    //不存在则创建instance
                     instance = createExtension(name);
                     holder.set(instance);
                 }
@@ -523,6 +544,9 @@ public class ExtensionLoader<T> {
     }
 
     @SuppressWarnings("unchecked")
+    /**
+     * 创建extension
+     */
     private T createExtension(String name) {
         // 从配置文件中加载所有的拓展类，可得到“配置项名称”到“配置类”的映射关系表
         Class<?> clazz = getExtensionClasses().get(name);
@@ -643,6 +667,11 @@ public class ExtensionLoader<T> {
         return getExtensionClasses().get(name);
     }
 
+    /**
+     * 缓存中获取Map<String, Class<?>>
+     * //todo 这个map的key和value分别是什么
+     * @return
+     */
     private Map<String, Class<?>> getExtensionClasses() {
         Map<String, Class<?>> classes = cachedClasses.get();
         if (classes == null) {
@@ -659,6 +688,11 @@ public class ExtensionLoader<T> {
 
     /**
      * synchronized in getExtensionClasses
+     */
+
+    /***
+     * 从配置文件中获取extensionClasses
+     * @return
      */
     private Map<String, Class<?>> loadExtensionClasses() {
         cacheDefaultExtensionName();
@@ -699,6 +733,12 @@ public class ExtensionLoader<T> {
         }
     }
 
+    /**
+     * 将 dir + type 的fileName指定的文件加载到extensionClasses中
+     * @param extensionClasses
+     * @param dir
+     * @param type
+     */
     private void loadDirectory(Map<String, Class<?>> extensionClasses, String dir, String type) {
         // fileName = 文件夹路径 + type 全限定名
         String fileName = dir + type;

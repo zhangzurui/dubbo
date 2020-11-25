@@ -82,7 +82,6 @@ public class ClassUtils {
 
     /**
      * get class loader
-     *
      * @param clazz
      * @return class loader
      */
