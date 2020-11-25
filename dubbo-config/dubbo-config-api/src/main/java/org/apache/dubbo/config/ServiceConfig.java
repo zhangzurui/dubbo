@@ -367,7 +367,9 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
     }
 
     public synchronized void export() {
+        //检查&&更新 配置
         checkAndUpdateSubConfigs();
+
 
         if (!shouldExport()) {
             return;
@@ -806,6 +808,12 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         return port;
     }
 
+    /**
+     * provider不为空 设置application、module、registries、monitor、protocols、configCenter
+     * model不为空 设置registries、monitor
+     * application不为空 设置registries、monitor
+     * 优先级 provider < model < application
+     */
     private void completeCompoundConfigs() {
         if (provider != null) {
             if (application == null) {

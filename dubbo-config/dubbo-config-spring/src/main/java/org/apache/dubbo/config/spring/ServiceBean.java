@@ -87,7 +87,9 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
     @Override
     public void setApplicationContext(ApplicationContext applicationContext) {
         this.applicationContext = applicationContext;
+        //todo 研究下这部分的内容
         SpringExtensionFactory.addApplicationContext(applicationContext);
+        //todo 这部分是干什么用的？
         supportedApplicationListener = addApplicationListener(applicationContext, this);
     }
 
@@ -105,6 +107,15 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
         return service;
     }
 
+
+    /**
+     * dubbo服务导出始于Sping容器发布刷新事件
+     * 导出分为三个部分
+     *  1、前置工作，检查参数，组装url
+     *  2、服务导出：导出服务到本地（JVM）和 导出服务到远程
+     *  3、向注册中心注册服务，用于服务发现
+     * @param event
+     */
     @Override
     public void onApplicationEvent(ContextRefreshedEvent event) {
         // 是否有延迟导出 && 是否已导出 && 是不是已被取消导出
@@ -340,6 +351,7 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
     public void export() {
         super.export();
         // Publish ServiceBeanExportedEvent
+        //发布export事件
         publishExportEvent();
     }
 

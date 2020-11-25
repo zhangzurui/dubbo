@@ -943,7 +943,9 @@ public class ExtensionLoader<T> {
     /**
      * 1.调用 getAdaptiveExtensionClass 方法获取自适应拓展 Class 对象
      * 2.通过反射进行实例化
-     * 3.调用 injectExtension 方法向拓展实例中注入依赖
+     * 3.调用 injectExtension 方法向拓展实例中注入依赖,Dubbo中两种类型的自适应扩展，一种手工编码，一种是自动生成的。
+     *   手工编码的自适应扩展累可能存在一些依赖，而自动生成的Adaptive扩展则不会依赖其他类。这里调用injectExtension方法
+     *   的目的是为手工编码的自适应扩展注入依赖。
      */
     private T createAdaptiveExtension() {
         try {
@@ -955,11 +957,14 @@ public class ExtensionLoader<T> {
     }
 
     private Class<?> getAdaptiveExtensionClass() {
-        //读取配置文件 获取配置的接口
+        //读取配置文件 获取某个接口的所有实现类。
+        //在获取实现类的过程中，如果某个实现类被Adaptive注解修饰了，那么该类就会被赋值给cachedAdaptiveClass变量。
+        // 此时下面的条件成立，直接返回cachedAdaptiveClass即可
         getExtensionClasses();
         if (cachedAdaptiveClass != null) {
             return cachedAdaptiveClass;
         }
+        //如果所有的实现类均未被Adaptive注解修饰，则创建自适应扩展类
         return cachedAdaptiveClass = createAdaptiveExtensionClass();
     }
 
@@ -969,9 +974,13 @@ public class ExtensionLoader<T> {
      * @return
      */
     private Class<?> createAdaptiveExtensionClass() {
+        //生成具有代理功能的代码--构建自适应扩展代码
         String code = new AdaptiveClassCodeGenerator(type, cachedDefaultName).generate();
+        //获取加载器
         ClassLoader classLoader = findClassLoader();
+        //获取编译器实现类
         org.apache.dubbo.common.compiler.Compiler compiler = ExtensionLoader.getExtensionLoader(org.apache.dubbo.common.compiler.Compiler.class).getAdaptiveExtension();
+        //执行编译动作,生成代理类class
         return compiler.compile(code, classLoader);
     }
 

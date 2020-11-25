@@ -29,7 +29,7 @@ import org.apache.dubbo.common.extension.SPI;
  * @see org.apache.dubbo.remoting.Transporters
  */
 @SPI("netty")
-public interface Transporter {
+public interface SerTransporter {
 
     /**
      * Bind a server.

@@ -82,19 +82,31 @@ public class AdaptiveClassCodeGenerator {
     }
 
     /**
+     * 示例：
+     * package com.alibaba.dubbo.rpc;
+     * import com.alibaba.dubbo.common.extension.ExtensionLoader;
+     * public class Protocol$Adaptive implements com.alibaba.dubbo.rpc.Protocol {
+     *     // 省略方法代码
+     * }
+     *
      * generate and return class code
      */
     public String generate() {
         // no need to generate adaptive class since there's no adaptive method found.
+        //检测接口方法是否包含Adaptive注解
         if (!hasAdaptiveMethod()) {
             throw new IllegalStateException("No adaptive method exist on extension " + type.getName() + ", refuse to create the adaptive class!");
         }
 
         StringBuilder code = new StringBuilder();
+        //生成package  代码：package + type 所在包
         code.append(generatePackageInfo());
+        //生成import 代码： import + ExtensionLoader + 全限定名
         code.append(generateImports());
+        //生成类代码 public class + type简单名称 + $Adaptive + implements + type全限定名 + {
         code.append(generateClassDeclaration());
 
+        //生成方法
         Method[] methods = type.getMethods();
         for (Method method : methods) {
             code.append(generateMethod(method));
@@ -130,6 +142,8 @@ public class AdaptiveClassCodeGenerator {
 
     /**
      * generate method not annotated with Adaptive with throwing unsupported exception
+     * 生成的代码格式如下：
+     *     throw new UnsupportedOperationException("method " + 方法签名 + of interface + 全限定接口名 + is not adaptive method!”)
      */
     private String generateUnsupported(Method method) {
         return String.format(CODE_UNSUPPORTED, method, type.getName());
@@ -198,14 +212,19 @@ public class AdaptiveClassCodeGenerator {
     private String generateMethodContent(Method method) {
         Adaptive adaptiveAnnotation = method.getAnnotation(Adaptive.class);
         StringBuilder code = new StringBuilder(512);
+        //方法上无Adaptive注解，则生成throw new UnsupportedOperationException(...)代码
         if (adaptiveAnnotation == null) {
             return generateUnsupported(method);
+            //有Adaptive注解方法
         } else {
+            //遍历参数列表，确定URL参数位置
             int urlTypeIndex = getUrlTypeIndex(method);
 
             // found parameter in URL type
             if (urlTypeIndex != -1) {
                 // Null Point check
+                //if (arg + urlTypeIndex == null)
+                //    throw new IllegalArgumentException("url == null");
                 code.append(generateUrlNullCheck(urlTypeIndex));
             } else {
                 // did not find parameter in URL type
@@ -346,8 +365,15 @@ public class AdaptiveClassCodeGenerator {
 
         // find URL getter method
         for (int i = 0; i < pts.length; ++i) {
+            //获取某一类型参数的全部方法
+            // 遍历方法列表，寻找可返回 URL 的 getter 方法
             for (Method m : pts[i].getMethods()) {
                 String name = m.getName();
+                // 1. 方法名以 get 开头，或方法名大于3个字符
+                // 2. 方法的访问权限为 public
+                // 3. 非静态方法
+                // 4. 方法参数数量为0
+                // 5. 方法返回值类型为 URL
                 if ((name.startsWith("get") || name.length() > 3)
                         && Modifier.isPublic(m.getModifiers())
                         && !Modifier.isStatic(m.getModifiers())
