@@ -25,6 +25,11 @@ public interface RegistryFactory extends org.apache.dubbo.registry.RegistryFacto
 
     Registry getRegistry(com.alibaba.dubbo.common.URL url);
 
+    /**
+     * 查看AbstractRegistryFactory
+     * @param url Registry address, is not allowed to be empty
+     * @return
+     */
     @Override
     default Registry getRegistry(URL url) {
         return this.getRegistry(new com.alibaba.dubbo.common.URL(url));

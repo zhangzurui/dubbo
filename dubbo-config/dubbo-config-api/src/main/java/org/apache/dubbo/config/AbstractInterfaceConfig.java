@@ -277,6 +277,7 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
         if (this.configCenter != null) {
             // TODO there may have duplicate refresh
             this.configCenter.refresh();
+            //todo ??
             prepareEnvironment();
         }
         ConfigManager.getInstance().refreshAll();
@@ -318,6 +319,11 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
     }
 
     /**
+     *
+     * 1、检测是否存在注册中心配置类，不存在则抛出异常
+     * 2、构建参数映射集合，也就是 map
+     * 3、构建注册中心链接列表
+     * 4、遍历链接列表，并根据条件决定是否将其添加到 registryList 中
      * Load the registry and conversion it to {@link URL}, the priority order is: system property > dubbo registry config
      *
      * @param provider whether it is the provider side
@@ -332,22 +338,34 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
                 if (StringUtils.isEmpty(address)) {
                     address = ANYHOST_VALUE;
                 }
+                // address != N/A
                 if (!RegistryConfig.NO_AVAILABLE.equalsIgnoreCase(address)) {
                     Map<String, String> map = new HashMap<String, String>();
+                    // 添加 ApplicationConfig 中的字段信息到 map 中
                     appendParameters(map, application);
+                    // 添加 RegistryConfig 字段信息到 map 中
                     appendParameters(map, config);
+                    // 添加 path 等信息到 map 中
                     map.put(PATH_KEY, RegistryService.class.getName());
+                    // 添加 pid，protocol 等信息到 map 中
                     appendRuntimeParameters(map);
+
                     if (!map.containsKey(PROTOCOL_KEY)) {
                         map.put(PROTOCOL_KEY, DUBBO_PROTOCOL);
                     }
+                    // 解析得到 URL 列表，address 可能包含多个注册中心 ip，
+                    // 因此解析得到的是一个 URL 列表
                     List<URL> urls = UrlUtils.parseURLs(address, map);
 
                     for (URL url : urls) {
+                        // 将 URL 协议头设置为 registry
                         url = URLBuilder.from(url)
                                 .addParameter(REGISTRY_KEY, url.getProtocol())
                                 .setProtocol(REGISTRY_PROTOCOL)
                                 .build();
+                        // 通过判断条件，决定是否添加 url 到 registryList 中，条件如下：
+                        // (服务提供者 && register = true 或 null)
+                        //    || (非服务提供者 && subscribe = true 或 null)
                         if ((provider && url.getParameter(REGISTER_KEY, true))
                                 || (!provider && url.getParameter(SUBSCRIBE_KEY, true))) {
                             registryList.add(url);
@@ -406,6 +424,7 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
     }
 
     static void appendRuntimeParameters(Map<String, String> map) {
+        // 添加 pid，protocol 等信息到 map 中
         map.put(DUBBO_VERSION_KEY, Version.getProtocolVersion());
         map.put(RELEASE_KEY, Version.getVersion());
         map.put(TIMESTAMP_KEY, String.valueOf(System.currentTimeMillis()));

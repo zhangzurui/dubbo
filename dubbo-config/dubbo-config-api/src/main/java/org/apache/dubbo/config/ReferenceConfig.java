@@ -213,21 +213,25 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
      * Check each config modules are created properly and override their properties if necessary.
      */
     public void checkAndUpdateSubConfigs() {
+        // 检测接口名合法性
         if (StringUtils.isEmpty(interfaceName)) {
             throw new IllegalStateException("<dubbo:reference interface=\"\" /> interface not allow null!");
         }
         completeCompoundConfigs();
         startConfigCenter();
         // get consumer's global configuration
+        // 检测 consumer 变量是否为空，为空则创建
         checkDefault();
         this.refresh();
         if (getGeneric() == null && getConsumer() != null) {
             setGeneric(getConsumer().getGeneric());
         }
+        // 检测是否为泛化接口
         if (ProtocolUtils.isGeneric(getGeneric())) {
             interfaceClass = GenericService.class;
         } else {
             try {
+                // 加载类
                 interfaceClass = Class.forName(interfaceName, true, Thread.currentThread()
                         .getContextClassLoader());
             } catch (ClassNotFoundException e) {
@@ -235,12 +239,16 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
             }
             checkInterfaceAndMethods(interfaceClass, methods);
         }
+        //解析文件
         resolveFile();
+        // 检测 Application 合法性
         checkApplication();
+        // 检测本地存根配置合法性
         checkMetadataReport();
     }
 
     public synchronized T get() {
+        //check update config
         checkAndUpdateSubConfigs();
 
         if (destroyed) {
@@ -286,13 +294,17 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
 
         map.put(SIDE_KEY, CONSUMER_SIDE);
 
+        //// 添加 side、协议版本信息、时间戳和进程号等信息到 map 中
         appendRuntimeParameters(map);
+        // 非泛化服务
         if (!ProtocolUtils.isGeneric(getGeneric())) {
+            // 获取版本
             String revision = Version.getVersion(interfaceClass, version);
             if (revision != null && revision.length() > 0) {
                 map.put(REVISION_KEY, revision);
             }
 
+            // 获取接口方法列表，并添加到 map 中
             String[] methods = Wrapper.getWrapper(interfaceClass).getMethodNames();
             if (methods.length == 0) {
                 logger.warn("No method found in service interface " + interfaceClass.getName());
@@ -302,6 +314,8 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
             }
         }
         map.put(INTERFACE_KEY, interfaceName);
+
+        // 将 ApplicationConfig、ConsumerConfig、ReferenceConfig 等对象的字段信息添加到 map 中
         appendParameters(map, metrics);
         appendParameters(map, application);
         appendParameters(map, module);
@@ -310,14 +324,21 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
         appendParameters(map, consumer);
         appendParameters(map, this);
         Map<String, Object> attributes = null;
+
+
+        //该实例包含了事件通知配置，比如 onreturn、onthrow、oninvoke 等
         if (CollectionUtils.isNotEmpty(methods)) {
             attributes = new HashMap<String, Object>();
+
+            // 遍历 MethodConfig 列表
             for (MethodConfig methodConfig : methods) {
                 appendParameters(map, methodConfig, methodConfig.getName());
                 String retryKey = methodConfig.getName() + ".retry";
+                // 检测 map 是否包含 methodName.retry
                 if (map.containsKey(retryKey)) {
                     String retryValue = map.remove(retryKey);
                     if ("false".equals(retryValue)) {
+                        // 添加重试次数配置 methodName.retries
                         map.put(methodConfig.getName() + ".retries", "0");
                     }
                 }
@@ -325,6 +346,8 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
             }
         }
 
+
+        // 获取服务消费者 ip 地址
         String hostToRegistry = ConfigUtils.getSystemProperty(DUBBO_IP_TO_REGISTRY);
         if (StringUtils.isEmpty(hostToRegistry)) {
             hostToRegistry = NetUtils.getLocalHost();
@@ -333,8 +356,11 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
         }
         map.put(REGISTER_IP_KEY, hostToRegistry);
 
+        // 创建代理类
         ref = createProxy(map);
 
+        // 根据服务名，ReferenceConfig，代理类构建 ConsumerModel，
+        // 并将 ConsumerModel 存入到 ApplicationModel 中
         String serviceKey = URL.buildKey(interfaceName, group, version);
         ApplicationModel.initConsumerModel(serviceKey, buildConsumerModel(serviceKey, attributes));
         initialized = true;
@@ -364,7 +390,8 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
             }
         } else {
             urls.clear(); // reference retry init will add url to urls, lead to OOM
-            if (url != null && url.length() > 0) { // user specified URL, could be peer-to-peer address, or register center's address.
+            // user specified URL, could be peer-to-peer address, or register center's address.
+            if (url != null && url.length() > 0) {
                 String[] us = SEMICOLON_SPLIT_PATTERN.split(url);
                 if (us != null && us.length > 0) {
                     for (String u : us) {
@@ -636,28 +663,35 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
     }
 
     private void resolveFile() {
+        // 从系统变量中获取与接口名对应的属性值
         String resolve = System.getProperty(interfaceName);
         String resolveFile = null;
         if (StringUtils.isEmpty(resolve)) {
+            // 从系统属性中获取解析文件路径
             resolveFile = System.getProperty("dubbo.resolve.file");
             if (StringUtils.isEmpty(resolveFile)) {
+                // 从指定位置加载配置文件
                 File userResolveFile = new File(new File(System.getProperty("user.home")), "dubbo-resolve.properties");
                 if (userResolveFile.exists()) {
+                    // 获取文件绝对路径
                     resolveFile = userResolveFile.getAbsolutePath();
                 }
             }
             if (resolveFile != null && resolveFile.length() > 0) {
                 Properties properties = new Properties();
                 try (FileInputStream fis = new FileInputStream(new File(resolveFile))) {
+                    // 从文件中加载配置
                     properties.load(fis);
                 } catch (IOException e) {
                     throw new IllegalStateException("Failed to load " + resolveFile + ", cause: " + e.getMessage(), e);
                 }
 
+                // 获取与接口名对应的配置
                 resolve = properties.getProperty(interfaceName);
             }
         }
         if (resolve != null && resolve.length() > 0) {
+            // 将 resolve 赋值给 url
             url = resolve;
             if (logger.isWarnEnabled()) {
                 if (resolveFile != null) {
