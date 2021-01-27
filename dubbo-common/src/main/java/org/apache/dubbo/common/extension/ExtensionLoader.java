@@ -76,31 +76,43 @@ public class ExtensionLoader<T> {
 
     private static final Pattern NAME_SEPARATOR = Pattern.compile("\\s*[,]+\\s*");
 
+    /**type, ExtensionLoader**/
     private static final ConcurrentMap<Class<?>, ExtensionLoader<?>> EXTENSION_LOADERS = new ConcurrentHashMap<>();
 
+    /**class, class的实例**/
     private static final ConcurrentMap<Class<?>, Object> EXTENSION_INSTANCES = new ConcurrentHashMap<>();
 
+    /**标识了@SPI的接口**/
     private final Class<?> type;
 
+    /**extensionFactory 工厂 跟自适应扩展点相关**/
     private final ExtensionFactory objectFactory;
 
+    /***配置文件里 实现类class,key**/
     private final ConcurrentMap<Class<?>, String> cachedNames = new ConcurrentHashMap<>();
 
+    /**配置文件中 key和实现类class**/
     private final Holder<Map<String, Class<?>>> cachedClasses = new Holder<>();
 
     private final Map<String, Object> cachedActivates = new ConcurrentHashMap<>();
+    /***key:配置文件中的key， Object为最终的对象*/
     private final ConcurrentMap<String, Holder<Object>> cachedInstances = new ConcurrentHashMap<>();
+    /**自适应扩展缓存**/
     private final Holder<Object> cachedAdaptiveInstance = new Holder<>();
+    /**接口的实现类上有@Adaoptive注解的class*/
     private volatile Class<?> cachedAdaptiveClass = null;
+    /**SPI注解的value值**/
     private String cachedDefaultName;
     private volatile Throwable createAdaptiveInstanceError;
 
+    /**接口的实现类中有 接口的构造函数 缓存到这里***/
     private Set<Class<?>> cachedWrapperClasses;
 
     private Map<String, IllegalStateException> exceptions = new ConcurrentHashMap<>();
 
     private ExtensionLoader(Class<?> type) {
         this.type = type;
+        //todo 疑问  这个是做什么用的？
         objectFactory = (type == ExtensionFactory.class ? null : ExtensionLoader.getExtensionLoader(ExtensionFactory.class).getAdaptiveExtension());
     }
 
@@ -560,7 +572,7 @@ public class ExtensionLoader<T> {
                 EXTENSION_INSTANCES.putIfAbsent(clazz, clazz.newInstance());
                 instance = (T) EXTENSION_INSTANCES.get(clazz);
             }
-            // 向实例中注入依赖
+            // 向实例中注入依赖（通过set方法注入）
             injectExtension(instance);
             Set<Class<?>> wrapperClasses = cachedWrapperClasses;
             if (CollectionUtils.isNotEmpty(wrapperClasses)) {
@@ -669,7 +681,7 @@ public class ExtensionLoader<T> {
 
     /**
      * 缓存中获取Map<String, Class<?>>
-     * //todo 这个map的key和value分别是什么
+     * 配置文件中 key和实现类class
      * @return
      */
     private Map<String, Class<?>> getExtensionClasses() {
@@ -695,6 +707,7 @@ public class ExtensionLoader<T> {
      * @return
      */
     private Map<String, Class<?>> loadExtensionClasses() {
+        //将 SPI 注解的value值 赋值给 cachedDefaultName
         cacheDefaultExtensionName();
 
         Map<String, Class<?>> extensionClasses = new HashMap<>();
@@ -814,6 +827,7 @@ public class ExtensionLoader<T> {
             // 设置 cachedAdaptiveClass缓存
             cacheAdaptiveClass(clazz);
             // 检测 clazz 是否是 Wrapper 类型
+            //表示Wrapper类型的判别标准是有 type接口的构造函数
         } else if (isWrapperClass(clazz)) {
             // 存储 clazz 到 cachedWrapperClasses 缓存中
             cacheWrapperClass(clazz);
