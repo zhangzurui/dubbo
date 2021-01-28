@@ -615,7 +615,8 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         if (ProtocolUtils.isGeneric(generic)) {
             map.put(GENERIC_KEY, generic);
             map.put(METHODS_KEY, ANY_VALUE);
-        } else {
+        }
+        else {
             String revision = Version.getVersion(interfaceClass, version);
             if (revision != null && revision.length() > 0) {
                 map.put(REVISION_KEY, revision);
@@ -649,10 +650,7 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         URL url = new URL(name, host, port, getContextPath(protocolConfig).map(p -> p + "/" + path).orElse(path), map);
 
 
-        /**
-         * 导出服务
-         */
-
+        /*** 导出服务*/
         if (ExtensionLoader.getExtensionLoader(ConfiguratorFactory.class)
                 .hasExtension(url.getProtocol())) {
             // 加载 ConfiguratorFactory，并生成 Configurator 实例，然后通过实例配置 url

@@ -319,7 +319,6 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
     }
 
     /**
-     *
      * 1、检测是否存在注册中心配置类，不存在则抛出异常
      * 2、构建参数映射集合，也就是 map
      * 3、构建注册中心链接列表
