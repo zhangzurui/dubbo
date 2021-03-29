@@ -126,7 +126,7 @@
         <arguments/>
         <checkstyle.skip>true</checkstyle.skip>
         <rat.skip>true</rat.skip>
-        <revision>2.7.4</revision>
+        <revision>2.7.4-temp</revision>
     </properties>
 
     <modules>
