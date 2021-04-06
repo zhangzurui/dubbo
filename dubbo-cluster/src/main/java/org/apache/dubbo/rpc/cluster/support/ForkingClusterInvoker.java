@@ -45,6 +45,11 @@ import static org.apache.dubbo.common.constants.CommonConstants.TIMEOUT_KEY;
  * Invoke a specific number of invokers concurrently, usually used for demanding real-time operations, but need to waste more service resources.
  *
  * <a href="http://en.wikipedia.org/wiki/Fork_(topology)">Fork</a>
+ *
+ *
+ * 运行时通过线程池创建多个线程，并发调用多个服务提供者。
+ * 只要有一个服务提供者成功返回了结果，doInvoke 方法就会立即结束运行。
+ * ForkingClusterInvoker 的应用场景是在一些对实时性要求比较高读操作（注意是读操作，并行写操作可能不安全）下使用，但这将会耗费更多的资源
  */
 public class ForkingClusterInvoker<T> extends AbstractClusterInvoker<T> {
 
@@ -67,12 +72,15 @@ public class ForkingClusterInvoker<T> extends AbstractClusterInvoker<T> {
             final List<Invoker<T>> selected;
             final int forks = getUrl().getParameter(FORKS_KEY, DEFAULT_FORKS);
             final int timeout = getUrl().getParameter(TIMEOUT_KEY, DEFAULT_TIMEOUT);
+            //如果 forks 配置不合理，则直接将 invokers 赋值给 selected
             if (forks <= 0 || forks >= invokers.size()) {
                 selected = invokers;
             } else {
                 selected = new ArrayList<>();
                 for (int i = 0; i < forks; i++) {
+                    // 选择 Invoker
                     Invoker<T> invoker = select(loadbalance, invocation, invokers, selected);
+                    //避免加入重复的invoker
                     if (!selected.contains(invoker)) {
                         //Avoid add the same invoker several times.
                         selected.add(invoker);
@@ -82,6 +90,7 @@ public class ForkingClusterInvoker<T> extends AbstractClusterInvoker<T> {
             RpcContext.getContext().setInvokers((List) selected);
             final AtomicInteger count = new AtomicInteger();
             final BlockingQueue<Object> ref = new LinkedBlockingQueue<>();
+            //并发调用
             for (final Invoker<T> invoker : selected) {
                 executor.execute(() -> {
                     try {
@@ -96,6 +105,7 @@ public class ForkingClusterInvoker<T> extends AbstractClusterInvoker<T> {
                 });
             }
             try {
+                // 从阻塞队列中取出远程调用结果  有一个执行成功 则返回
                 Object ret = ref.poll(timeout, TimeUnit.MILLISECONDS);
                 if (ret instanceof Throwable) {
                     Throwable e = (Throwable) ret;

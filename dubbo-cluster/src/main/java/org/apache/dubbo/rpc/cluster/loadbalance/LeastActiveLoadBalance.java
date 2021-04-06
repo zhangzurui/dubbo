@@ -31,6 +31,20 @@ import java.util.concurrent.ThreadLocalRandom;
  * If there is only one invoker, use the invoker directly;
  * if there are multiple invokers and the weights are not the same, then random according to the total weight;
  * if there are multiple invokers and the same weight, then randomly called.
+ *
+ *
+ * 最小活跃数负载均衡
+ * 活跃调用数越小，表明该服务提供者效率越高，单位时间内可处理更多的请求。
+ * 此时应优先将请求分配给该服务提供者。在具体实现中，每个服务提供者对应一个活跃数 active。
+ * 初始情况下，所有服务提供者活跃数均为0。每收到一个请求，活跃数加1，完成请求后则将活跃数减1。
+ * 在服务运行一段时间后，性能好的服务提供者处理请求的速度更快，因此活跃数下降的也越快，
+ * 此时这样的服务提供者能够优先获取到新的服务请求、这就是最小活跃数负载均衡算法的基本思想。
+ * 除了最小活跃数，LeastActiveLoadBalance 在实现上还引入了权重值。所以准确的来说，
+ * LeastActiveLoadBalance 是基于加权最小活跃数算法实现的。
+ * 举个例子说明一下，在一个服务提供者集群中，有两个性能优异的服务提供者。
+ * 某一时刻它们的活跃数相同，此时 Dubbo 会根据它们的权重去分配请求，权重越大，获取到新请求的概率就越大。
+ * 如果两个服务提供者权重相同，此时随机选择一个即可
+ *
  */
 public class LeastActiveLoadBalance extends AbstractLoadBalance {
 
@@ -41,10 +55,12 @@ public class LeastActiveLoadBalance extends AbstractLoadBalance {
         // Number of invokers
         int length = invokers.size();
         // The least active value of all invokers
+        //最小活跃数
         int leastActive = -1;
         // The number of invokers having the same least active value (leastActive)
         int leastCount = 0;
         // The index of invokers having the same least active value (leastActive)
+        //leastIndexs 用于记录具有相同“最小活跃数”的 Invoker 在 invokers 列表中的下标信息
         int[] leastIndexes = new int[length];
         // the weight of every invokers
         int[] weights = new int[length];

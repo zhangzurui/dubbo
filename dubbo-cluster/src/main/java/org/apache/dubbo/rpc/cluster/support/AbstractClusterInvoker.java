@@ -123,24 +123,37 @@ public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
         if (CollectionUtils.isEmpty(invokers)) {
             return null;
         }
+
+        //获取调用的方法名
         String methodName = invocation == null ? StringUtils.EMPTY : invocation.getMethodName();
 
+        //获取sticky配置，sticky表示粘滞连接。所谓粘滞连接是指 让服务消费者尽可能的调用同一个服务提供者，除非该提供者挂了再进行切换
         boolean sticky = invokers.get(0).getUrl()
                 .getMethodParameter(methodName, CLUSTER_STICKY_KEY, DEFAULT_CLUSTER_STICKY);
 
         //ignore overloaded method
+        // 检测 invokers 列表是否包含 stickyInvoker，如果不包含，
+        // 说明 stickyInvoker 代表的服务提供者挂了，此时需要将其置空
         if (stickyInvoker != null && !invokers.contains(stickyInvoker)) {
             stickyInvoker = null;
         }
         //ignore concurrency problem
+        // 在 sticky 为 true，且 stickyInvoker != null 的情况下。如果 selected 包含
+        // stickyInvoker，表明 stickyInvoker 对应的服务提供者可能因网络原因未能成功提供服务。
+        // 但是该提供者并没挂，此时 invokers 列表中仍存在该服务提供者对应的 Invoker。
         if (sticky && stickyInvoker != null && (selected == null || !selected.contains(stickyInvoker))) {
+            // availablecheck 表示是否开启了可用性检查，如果开启了，则调用 stickyInvoker 的
+            // isAvailable 方法进行检查，如果检查通过，则直接返回 stickyInvoker。
             if (availablecheck && stickyInvoker.isAvailable()) {
                 return stickyInvoker;
             }
         }
 
+        // 如果线程走到当前代码处，说明前面的 stickyInvoker 为空，或者不可用。
+        // 此时继续调用 doSelect 选择 Invoker
         Invoker<T> invoker = doSelect(loadbalance, invocation, invokers, selected);
 
+        // 如果 sticky 为 true，则将负载均衡组件选出的 Invoker 赋值给 stickyInvoker
         if (sticky) {
             stickyInvoker = invoker;
         }
@@ -156,20 +169,28 @@ public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
         if (invokers.size() == 1) {
             return invokers.get(0);
         }
+
+        //通过负载均衡组件 选择Invoker
         Invoker<T> invoker = loadbalance.select(invokers, getUrl(), invocation);
 
         //If the `invoker` is in the  `selected` or invoker is unavailable && availablecheck is true, reselect.
+        // 如果 selected 包含负载均衡选择出的 Invoker，或者该 Invoker 无法经过可用性检查，此时进行重选
         if ((selected != null && selected.contains(invoker))
                 || (!invoker.isAvailable() && getUrl() != null && availablecheck)) {
             try {
+                //进行重选
                 Invoker<T> rInvoker = reselect(loadbalance, invocation, invokers, selected, availablecheck);
                 if (rInvoker != null) {
+                    // 如果 rinvoker 不为空，则将其赋值给 invoker
                     invoker = rInvoker;
                 } else {
                     //Check the index of current selected invoker, if it's not the last one, choose the one at index+1.
+                    // rinvoker 为空，定位 invoker 在 invokers 中的位置
                     int index = invokers.indexOf(invoker);
                     try {
                         //Avoid collision
+                        // 获取 index + 1 位置处的 Invoker，以下代码等价于：
+                        //     invoker = invokers.get((index + 1) % invokers.size());
                         invoker = invokers.get((index + 1) % invokers.size());
                     } catch (Exception e) {
                         logger.warn(e.getMessage() + " may because invokers list dynamic change, ignore.", e);
@@ -207,6 +228,7 @@ public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
                 continue;
             }
 
+            //优先选择 不在selected中的invokes
             if (selected == null || !selected.contains(invoker)) {
                 reselectInvokers.add(invoker);
             }
@@ -232,19 +254,31 @@ public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
         return null;
     }
 
+    /**
+     * 集群工作过程可分为两个阶段，第一个阶段是在服务消费者初始化期间，这个在服务引用那篇文章中分析过，就不赘述。
+     * 第二个阶段是在服务消费者进行远程调用时，此时 AbstractClusterInvoker 的 invoke 方法会被调用
+     * @param invocation
+     * @return
+     * @throws RpcException
+     */
     @Override
     public Result invoke(final Invocation invocation) throws RpcException {
         checkWhetherDestroyed();
 
         // binding attachments into invocation.
         Map<String, String> contextAttachments = RpcContext.getContext().getAttachments();
+        // 绑定 attachments 到 invocation 中.
         if (contextAttachments != null && contextAttachments.size() != 0) {
             ((RpcInvocation) invocation).addAttachments(contextAttachments);
         }
 
+        //列举Invoker -- 服务目录（内含Router.route路由）
         List<Invoker<T>> invokers = list(invocation);
+        //加载loadBalance
         LoadBalance loadbalance = initLoadBalance(invokers, invocation);
         RpcUtils.attachInvocationIdIfAsync(getUrl(), invocation);
+
+        //进行后续操作
         return doInvoke(invocation, invokers, loadbalance);
     }
 
